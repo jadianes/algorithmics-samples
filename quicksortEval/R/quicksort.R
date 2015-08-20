@@ -1,55 +1,14 @@
-
-pivot_first <- function(a) {
-    return(1)
-}
-
-pivot_last <- function(a) {
-    return(length(a))
-}
-
-pivot_random <- function(a) {
-    return (sample(1:(length(a)-1),1))
-}
-
-pivot_median_3 <- function(a) {
-    first <- a[1]
-    last <- a[length(a)]
-    if ( (length(a)%%2) == 0) {
-        mid <- a[length(a)/2]
-    } else {
-        mid <- a[length(a)/2 + 1]
-    }
-       
-    sorted3 <- sort(c(first,last,mid))
-    return (which(a==sorted3[2]))
-}
-
-partition <- function(a,pindex) {
-    # swap pivot with first element if needed
-    if ( pindex!= 1) {
-        aux <- a[pindex]
-        a[pindex] <- a[1]
-        a[1] <- aux
-        pindex <- 1
-    }
-    p <- a[1]
-    i <- 2
-    # partition loop
-    for (j in 1:length(a)) {
-        if (a[j] < p) { ## if a[j] is less than the pivot, swap
-            aux <- a[i]
-            a[i] <- a[j]
-            a[j] <- aux
-            i <- i+1
-        }
-    }
-    a[1] <- a[i-1]
-    a[i-1] <- p
-
-    return (list(a,i-1))
-}
-
-quicksort_counter <- function(a, PIVOTFUN) {
+#' Sorts the input numeric vector using QUICKSORT and counts the number of comparisons
+#' Intended to be used to compare different strategies of pivot selection
+#'
+#' @param a An integer numeric vector
+#' @param PIVOTFUN The function that selects the pivot element index
+#' @return A list with the input vector already sorted and a count of the 
+#' number of comparisons
+#' @author Jose A. Dianes
+#' @details TODO
+#' @export
+quicksort_counter <- function(a, PIVOTFUN=pivot_median_3) {
 
     if (length(a) <= 1) {
         return ( list(a, 0) )   
@@ -89,4 +48,88 @@ quicksort_counter <- function(a, PIVOTFUN) {
             ))
         }
     }
+}
+
+
+#' Sorts the input numeric vector using QUICKSORT and foreach parallel
+#'
+#' @param a An integer numeric vector
+#' @param PIVOTFUN The function that selects the pivot element index
+#' @return A list with the input vector already sorted 
+#' @author Jose A. Dianes
+#' @details TODO
+#' @importFrom foreach foreach %dopar%
+#' @importFrom doMC registerDoMC
+#' @importFrom rbenchmark benchmark
+#' @export
+quicksort_mc <- function(a, PIVOTFUN=pivot_median_3, ncores=2) {
+    registerDoMC(cores=ncores)
+    res <- quicksort_par_impl(a, PIVOTFUN, ncores)
+    return (res)
+}
+
+quicksort_par_impl <- function(a, PIVOTFUN, num.cores) {
+    if (length(a) <= 1) {
+        return (a)   
+    } else {
+        # select pivot
+        pindex <- PIVOTFUN(a)
+        pelem <- a[pindex]
+
+        # partition array
+        apartandpindex <- partition(a, pindex)
+        apart <- apartandpindex[[1]]
+        pindex <- apartandpindex[[2]]
+        
+        if (num.cores>1) {
+            # quicksort in parallel
+            if (pindex>=length(a)) {
+                from.index <- c(1,pindex)
+                to.index <- c(pindex-1,pindex)
+            } else if (pindex<=1) {
+                from.index <- c(pindex,pindex+1)
+                to.index <- c(pindex,length(a))
+            } else {
+                from.index <- c(1,pindex,pindex+1)
+                to.index <- c(pindex-1,pindex,length(a))
+            }
+
+            # do par
+            num.cores <- num.cores-length(from.index)
+            sorted_parts <- 
+                foreach( 
+                    from=from.index,
+                    to=to.index
+                ) %dopar% 
+                    quicksort_par_impl(apart[from:to], PIVOTFUN, num.cores)
+            num.cores <- num.cores+length(from.index)
+            return (unlist(sorted_parts))
+        } else {
+            # quick sort recursively, checking edge cases
+            if (pindex>=length(a)) {
+                return ( 
+                    c(
+                        quicksort_par_impl(apart[1:(pindex-1)], PIVOTFUN, num.cores), 
+                        pelem
+                    ) 
+                )
+            } else if (pindex<=1) {
+                return ( 
+                    c(
+                        pelem, 
+                        quicksort_par_impl(apart[(pindex+1):length(a)], PIVOTFUN, num.cores)
+                    ) 
+                )
+            } else {
+                return ( 
+                    c( 
+                        quicksort_par_impl(apart[1:(pindex-1)], PIVOTFUN, num.cores), 
+                        pelem, 
+                        quicksort_par_impl(apart[(pindex+1):length(a)], PIVOTFUN, num.cores)
+                    )
+                )
+            }
+        }
+    }
+
 }

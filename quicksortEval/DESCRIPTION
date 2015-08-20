@@ -1,0 +1,10 @@
+Package: quicksortEval
+Type: Package
+Title: quicksortEval
+Version: 1.0
+Date: 2014-10-22
+Author: Jose A Dianes
+Maintainer: Jose A Dianes <jadianes@gmail.com>
+Imports: foreach, doMC, rbenchmark
+Description: An R package evaluate different Quicksort strategies
+License: GPL-3
